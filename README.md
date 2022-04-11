@@ -14,7 +14,7 @@ name: Conventional Commits
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:

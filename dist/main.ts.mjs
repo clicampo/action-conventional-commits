@@ -1,25 +1,9 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target, mod));
+import { GitHub, context } from '@actions/github';
+import * as core from '@actions/core';
+import { getInput } from '@actions/core';
+import get from 'lodash.get';
 
-// src/main.ts
-var import_github2 = require("@actions/github");
-var core = __toESM(require("@actions/core"));
-
-// src/isValidCommitMessage.ts
-var DEFAULT_COMMIT_TYPES = [
+const DEFAULT_COMMIT_TYPES = [
   "feat",
   "fix",
   "docs",
@@ -33,7 +17,7 @@ var DEFAULT_COMMIT_TYPES = [
   "merge",
   "wip"
 ];
-var isValidCommitMessage = (message, availableTypes = DEFAULT_COMMIT_TYPES) => {
+const isValidCommitMessage = (message, availableTypes = DEFAULT_COMMIT_TYPES) => {
   if (message.startsWith("Merge ") || message.startsWith("Revert "))
     return true;
   let [possiblyValidCommitType] = message.split(":");
@@ -43,24 +27,19 @@ var isValidCommitMessage = (message, availableTypes = DEFAULT_COMMIT_TYPES) => {
   possiblyValidCommitType = possiblyValidCommitType.replace(/\s/g, "").replace(/()/g, "").replace(/[^a-z]/g, "");
   return availableTypes.includes(possiblyValidCommitType);
 };
-var isValidCommitMessage_default = isValidCommitMessage;
 
-// src/extractCommits.ts
-var import_lodash = __toESM(require("lodash.get"));
-var import_github = require("@actions/github");
-var import_core = require("@actions/core");
-var extractCommits = async (context2) => {
-  const pushCommits = Array.isArray((0, import_lodash.default)(context2, "payload.commits"));
+const extractCommits = async (context) => {
+  const pushCommits = Array.isArray(get(context, "payload.commits"));
   if (pushCommits)
-    return context2.payload.commits;
-  const prNumber = (0, import_lodash.default)(context2, "payload.pull_request.number");
+    return context.payload.commits;
+  const prNumber = get(context, "payload.pull_request.number");
   if (prNumber) {
     try {
-      const token = (0, import_core.getInput)("github-token");
-      const github = new import_github.GitHub(token);
+      const token = getInput("github-token");
+      const github = new GitHub(token);
       const params = {
-        owner: context2.repo.owner,
-        repo: context2.repo.repo,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
         pull_number: prNumber
       };
       const { data } = await github.pulls.listCommits(params);
@@ -73,11 +52,9 @@ var extractCommits = async (context2) => {
   }
   return [];
 };
-var extractCommits_default = extractCommits;
 
-// src/extractPullRequest.ts
-var extractPullRequest = async (context2) => {
-  const { payload } = context2;
+const extractPullRequest = async (context) => {
+  const { payload } = context;
   const { pull_request: pullRequest } = payload;
   if (!pullRequest)
     throw new Error("No pull request found in the payload");
@@ -87,17 +64,16 @@ var extractPullRequest = async (context2) => {
   return title;
 };
 
-// src/main.ts
 async function run() {
   if (core.getInput("check-pr-title") === "true") {
-    const prTitle = await extractPullRequest(import_github2.context);
-    if (!isValidCommitMessage_default(prTitle))
+    const prTitle = await extractPullRequest(context);
+    if (!isValidCommitMessage(prTitle))
       core.setFailed("\u{1F6A9} PR title is not valid");
     else
       core.info("\u2705 PR title is valid");
   }
   core.info("\u2139\uFE0F Checking if commit messages are following the Conventional Commits specification...");
-  const extractedCommits = await extractCommits_default(import_github2.context);
+  const extractedCommits = await extractCommits(context);
   if (extractedCommits.length === 0) {
     core.info("No commits to check, skipping...");
     return;
@@ -106,7 +82,7 @@ async function run() {
   core.startGroup("Commit messages:");
   for (let i = 0; i < extractedCommits.length; i++) {
     const commit = extractedCommits[i];
-    if (isValidCommitMessage_default(commit.message)) {
+    if (isValidCommitMessage(commit.message)) {
       core.info(`\u2705 ${commit.message}`);
     } else {
       core.info(`\u{1F6A9} ${commit.message}`);
